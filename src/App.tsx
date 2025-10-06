@@ -16,10 +16,10 @@ function App() {
   useEffect(() => {
     checkAuth();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event: string, session: any) => {
+      if (_event === 'SIGNED_IN' && session) {
         checkAdminStatus(session.user.id);
-      } else if (event === 'SIGNED_OUT') {
+      } else if (_event === 'SIGNED_OUT') {
         setIsAuthenticated(false);
       }
     });

@@ -219,7 +219,7 @@ export default function AdminDashboard() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <button
-                        onClick={() => toggleLicenseStatus(license.id, license.is_active)}
+                        onClick={() => toggleLicenseStatus(license.id, license.is_active ?? false)}
                         className="flex items-center gap-1"
                       >
                         {license.is_active ? (
@@ -295,7 +295,7 @@ export default function AdminDashboard() {
                       </code>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {new Date(userLicense.activated_at).toLocaleDateString('ar-SA')}
+                      {userLicense.activated_at ? new Date(userLicense.activated_at).toLocaleDateString('ar-SA') : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {new Date(userLicense.expires_at).toLocaleDateString('ar-SA')}

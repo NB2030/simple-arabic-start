@@ -76,7 +76,7 @@ export const authService = {
   },
 
   onAuthStateChange(callback: (user: AuthUser | null) => void) {
-    return supabase.auth.onAuthStateChange((event, session) => {
+    return supabase.auth.onAuthStateChange((_event: string, session: any) => {
       (async () => {
         if (session?.user) {
           const user = await authService.getCurrentUser();

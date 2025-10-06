@@ -39,7 +39,7 @@ export default function AuthForm({ onAuthSuccess }: AuthFormProps) {
           }
 
           if (result.expiresAt) {
-            const { data: profile } = await authService.getCurrentUser();
+            const profile = await authService.getCurrentUser();
             if (profile) {
               licenseService.saveOfflineLicense({
                 userId: user.id,
