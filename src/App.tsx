@@ -18,7 +18,7 @@ function App() {
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event: string, session: any) => {
       if (_event === 'SIGNED_IN' && session) {
-        checkAdminStatus(session.user.id);
+        checkAdminStatus();
       } else if (_event === 'SIGNED_OUT') {
         setIsAuthenticated(false);
       }
@@ -34,7 +34,7 @@ function App() {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (user) {
-        await checkAdminStatus(user.id);
+        await checkAdminStatus();
       }
     } catch (error) {
       console.error('Auth check error:', error);
@@ -43,15 +43,13 @@ function App() {
     }
   };
 
-  const checkAdminStatus = async (userId: string) => {
+  const checkAdminStatus = async () => {
     try {
-      const { data: adminData, error } = await supabase
-        .from('admin_users')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
+      // Use server-side admin verification via Edge Function
+      const { data, error } = await supabase.functions.invoke('check-admin');
 
-      if (error || !adminData) {
+      if (error || !data?.isAdmin) {
+        console.error('Admin verification failed:', error);
         await supabase.auth.signOut();
         setIsAuthenticated(false);
         return;

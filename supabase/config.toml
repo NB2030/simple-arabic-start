@@ -1,1 +1,13 @@
 project_id = "iwipefxjymkqpsuxkupo"
+
+[functions.activate-license]
+verify_jwt = false
+
+[functions.validate-license]
+verify_jwt = false
+
+[functions.license-service-api]
+verify_jwt = false
+
+[functions.check-admin]
+verify_jwt = false
