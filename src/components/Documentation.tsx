@@ -1,4 +1,4 @@
-import { Book, Code, Key, User, CheckCircle, Copy } from 'lucide-react';
+import { Book, Code, Key, User, CheckCircle, Copy, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 
 export default function Documentation() {
@@ -551,6 +551,324 @@ Content-Type: application/json`}</pre>
                   6
                 </div>
                 <p className="text-gray-700">المستخدم يمكنه الوصول للتطبيق حتى بدون إنترنت (من الكاش)</p>
+              </div>
+            </div>
+          </section>
+
+          {/* New Migration Section */}
+          <section className="bg-white rounded-xl shadow-sm p-6 border-2 border-amber-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <AlertCircle className="w-6 h-6 text-amber-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900">دليل الترحيل من النسخة السابقة</h2>
+            </div>
+
+            <div className="prose prose-sm max-w-none text-gray-700 space-y-6">
+              <div className="bg-amber-50 border-r-4 border-amber-400 p-4 rounded-lg">
+                <p className="font-bold text-amber-900 mb-2">⚠️ مهم: تحديثات أمنية</p>
+                <p className="text-amber-800">
+                  تم تحسين النظام بإضافة طبقة أمان إضافية للتحقق من صلاحيات المشرفين. يجب عليك تحديث كود التحقق من صلاحيات الأدمن.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">1. التغييرات الرئيسية</h3>
+                <ul className="list-disc list-inside space-y-2 mr-4">
+                  <li><strong>التحقق من صلاحيات الأدمن:</strong> الآن يتم عبر Edge Function بدلاً من الاستعلام المباشر من جهة العميل</li>
+                  <li><strong>استيراد Supabase:</strong> تم تحديث جميع Edge Functions لاستخدام ESM imports</li>
+                  <li><strong>التحقق من كلمة المرور:</strong> تم تطبيق معايير أقوى للتحقق من صحة كلمات المرور</li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">2. تحديث Edge Functions</h3>
+                <p className="mb-3">قم بتحديث استيراد Supabase في جميع Edge Functions:</p>
+                <div className="relative">
+                  <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
+                    <button
+                      onClick={() =>
+                        copyToClipboard(
+                          `// ❌ الطريقة القديمة
+import { createClient } from '@supabase/supabase-js';
+
+// ✅ الطريقة الجديدة
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.74.0';`,
+                          'migration-imports'
+                        )
+                      }
+                      className="absolute top-2 left-2 p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+                    >
+                      {copiedCode === 'migration-imports' ? (
+                        <CheckCircle className="w-4 h-4 text-green-400" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
+                    </button>
+                    <pre className="text-sm">
+                      <code>{`// ❌ الطريقة القديمة
+import { createClient } from '@supabase/supabase-js';
+
+// ✅ الطريقة الجديدة
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.74.0';`}</code>
+                    </pre>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">3. إضافة Edge Function للتحقق من صلاحيات الأدمن</h3>
+                <p className="mb-3">قم بإنشاء Edge Function جديد للتحقق الآمن من صلاحيات المشرفين:</p>
+                <div className="relative">
+                  <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
+                    <button
+                      onClick={() =>
+                        copyToClipboard(
+                          `// supabase/functions/check-admin/index.ts
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.74.0';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const authHeader = req.headers.get('Authorization')!;
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user } } = await supabaseClient.auth.getUser();
+
+    if (!user) {
+      return new Response(JSON.stringify({ isAdmin: false }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
+    }
+
+    const serviceRoleClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { data, error } = await serviceRoleClient.rpc('is_admin', {
+      check_user_id: user.id,
+    });
+
+    if (error) throw error;
+
+    return new Response(JSON.stringify({ isAdmin: !!data }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ isAdmin: false, error: error.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
+  }
+});`,
+                          'migration-check-admin'
+                        )
+                      }
+                      className="absolute top-2 left-2 p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+                    >
+                      {copiedCode === 'migration-check-admin' ? (
+                        <CheckCircle className="w-4 h-4 text-green-400" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
+                    </button>
+                    <pre className="text-sm overflow-x-auto">
+                      <code>{`// supabase/functions/check-admin/index.ts
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.74.0';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const authHeader = req.headers.get('Authorization')!;
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user } } = await supabaseClient.auth.getUser();
+
+    if (!user) {
+      return new Response(JSON.stringify({ isAdmin: false }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
+    }
+
+    const serviceRoleClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { data, error } = await serviceRoleClient.rpc('is_admin', {
+      check_user_id: user.id,
+    });
+
+    if (error) throw error;
+
+    return new Response(JSON.stringify({ isAdmin: !!data }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ isAdmin: false, error: error.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
+  }
+});`}</code>
+                    </pre>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">4. تحديث كود التطبيق</h3>
+                <p className="mb-3">استبدل كود التحقق من صلاحيات الأدمن في تطبيقك:</p>
+                <div className="relative mb-4">
+                  <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
+                    <button
+                      onClick={() =>
+                        copyToClipboard(
+                          `// ❌ الطريقة القديمة (غير آمنة)
+const { data } = await supabase
+  .from('admin_users')
+  .select('*')
+  .eq('user_id', user.id)
+  .maybeSingle();
+
+const isAdmin = !!data;
+
+// ✅ الطريقة الجديدة (آمنة)
+const { data, error } = await supabase.functions.invoke('check-admin');
+
+if (error || !data?.isAdmin) {
+  console.error('Admin verification failed');
+  await supabase.auth.signOut();
+  return;
+}
+
+const isAdmin = true;`,
+                          'migration-client-code'
+                        )
+                      }
+                      className="absolute top-2 left-2 p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+                    >
+                      {copiedCode === 'migration-client-code' ? (
+                        <CheckCircle className="w-4 h-4 text-green-400" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
+                    </button>
+                    <pre className="text-sm">
+                      <code>{`// ❌ الطريقة القديمة (غير آمنة)
+const { data } = await supabase
+  .from('admin_users')
+  .select('*')
+  .eq('user_id', user.id)
+  .maybeSingle();
+
+const isAdmin = !!data;
+
+// ✅ الطريقة الجديدة (آمنة)
+const { data, error } = await supabase.functions.invoke('check-admin');
+
+if (error || !data?.isAdmin) {
+  console.error('Admin verification failed');
+  await supabase.auth.signOut();
+  return;
+}
+
+const isAdmin = true;`}</code>
+                    </pre>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">5. التحقق من صحة كلمة المرور</h3>
+                <p className="mb-3">تأكد من استخدام التحقق القوي من كلمات المرور في جميع أنحاء التطبيق:</p>
+                <div className="relative">
+                  <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
+                    <button
+                      onClick={() =>
+                        copyToClipboard(
+                          `import { z } from 'zod';
+
+export const passwordSchema = z
+  .string()
+  .min(8, { message: 'يجب أن تحتوي كلمة المرور على 8 أحرف على الأقل' })
+  .regex(/[A-Z]/, { message: 'يجب أن تحتوي على حرف كبير واحد على الأقل' })
+  .regex(/[a-z]/, { message: 'يجب أن تحتوي على حرف صغير واحد على الأقل' })
+  .regex(/[0-9]/, { message: 'يجب أن تحتوي على رقم واحد على الأقل' });
+
+// استخدام
+const result = passwordSchema.safeParse(password);
+if (!result.success) {
+  console.error(result.error.issues[0].message);
+}`,
+                          'migration-password-validation'
+                        )
+                      }
+                      className="absolute top-2 left-2 p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+                    >
+                      {copiedCode === 'migration-password-validation' ? (
+                        <CheckCircle className="w-4 h-4 text-green-400" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
+                    </button>
+                    <pre className="text-sm">
+                      <code>{`import { z } from 'zod';
+
+export const passwordSchema = z
+  .string()
+  .min(8, { message: 'يجب أن تحتوي كلمة المرور على 8 أحرف على الأقل' })
+  .regex(/[A-Z]/, { message: 'يجب أن تحتوي على حرف كبير واحد على الأقل' })
+  .regex(/[a-z]/, { message: 'يجب أن تحتوي على حرف صغير واحد على الأقل' })
+  .regex(/[0-9]/, { message: 'يجب أن تحتوي على رقم واحد على الأقل' });
+
+// استخدام
+const result = passwordSchema.safeParse(password);
+if (!result.success) {
+  console.error(result.error.issues[0].message);
+}`}</code>
+                    </pre>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-green-50 border-r-4 border-green-400 p-4 rounded-lg">
+                <p className="font-bold text-green-900 mb-2">✅ نصائح مهمة بعد الترحيل:</p>
+                <ul className="list-disc list-inside space-y-1 text-green-800">
+                  <li>اختبر جميع وظائف التسجيل والدخول</li>
+                  <li>تأكد من عمل Edge Functions بشكل صحيح</li>
+                  <li>راجع أذونات قاعدة البيانات (RLS)</li>
+                  <li>قم بتحديث أي وثائق API في مشروعك</li>
+                </ul>
               </div>
             </div>
           </section>

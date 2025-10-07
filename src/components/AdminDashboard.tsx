@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, License, UserLicenseWithDetails } from '../lib/supabase';
-import { Key, Users, Calendar, CheckCircle, XCircle, Plus, Trash2 } from 'lucide-react';
+import { Key, Users, Calendar, CheckCircle, XCircle, Plus, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function AdminDashboard() {
   const [licenses, setLicenses] = useState<License[]>([]);
@@ -12,6 +12,9 @@ export default function AdminDashboard() {
     max_activations: 1,
     notes: '',
   });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     loadData();
@@ -105,6 +108,26 @@ export default function AdminDashboard() {
       console.error('Error updating license:', error);
     }
   };
+
+  // Filter and paginate user licenses
+  const filteredUserLicenses = userLicenses.filter((userLicense) => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      userLicense.profiles?.full_name?.toLowerCase().includes(searchLower) ||
+      userLicense.profiles?.email?.toLowerCase().includes(searchLower) ||
+      userLicense.licenses?.license_key?.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const totalPages = Math.ceil(filteredUserLicenses.length / itemsPerPage);
+  const paginatedUserLicenses = filteredUserLicenses.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   if (loading) {
     return (
@@ -253,7 +276,21 @@ export default function AdminDashboard() {
 
         <div className="bg-white rounded-xl shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-900">المستخدمون والتراخيص</h2>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <h2 className="text-xl font-bold text-gray-900">المستخدمون والتراخيص</h2>
+              
+              {/* Search Input */}
+              <div className="relative w-full sm:w-96">
+                <Search className="absolute right-3 top-3 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="البحث بالاسم أو البريد أو مفتاح الترخيص..."
+                  className="w-full pr-10 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -281,44 +318,99 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {userLicenses.map((userLicense) => (
-                  <tr key={userLicense.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {userLicense.profiles?.full_name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {userLicense.profiles?.email}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <code className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
-                        {userLicense.licenses?.license_key}
-                      </code>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {userLicense.activated_at ? new Date(userLicense.activated_at).toLocaleDateString('ar-SA') : '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {new Date(userLicense.expires_at).toLocaleDateString('ar-SA')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {userLicense.is_active &&
-                      new Date(userLicense.expires_at) > new Date() ? (
-                        <span className="flex items-center gap-1 text-green-600">
-                          <CheckCircle className="w-4 h-4" />
-                          مفعل
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-red-600">
-                          <XCircle className="w-4 h-4" />
-                          منتهي
-                        </span>
-                      )}
+                {paginatedUserLicenses.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                      {searchQuery ? 'لا توجد نتائج للبحث' : 'لا توجد تراخيص مفعلة بعد'}
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  paginatedUserLicenses.map((userLicense) => (
+                    <tr key={userLicense.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {userLicense.profiles?.full_name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {userLicense.profiles?.email}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <code className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
+                          {userLicense.licenses?.license_key}
+                        </code>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {userLicense.activated_at ? new Date(userLicense.activated_at).toLocaleDateString('ar-SA') : '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {new Date(userLicense.expires_at).toLocaleDateString('ar-SA')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {userLicense.is_active &&
+                        new Date(userLicense.expires_at) > new Date() ? (
+                          <span className="flex items-center gap-1 text-green-600">
+                            <CheckCircle className="w-4 h-4" />
+                            مفعل
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-red-600">
+                            <XCircle className="w-4 h-4" />
+                            منتهي
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-600">
+                  عرض {((currentPage - 1) * itemsPerPage) + 1} إلى {Math.min(currentPage * itemsPerPage, filteredUserLicenses.length)} من أصل {filteredUserLicenses.length}
+                </div>
+                
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="flex items-center gap-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                    السابق
+                  </button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-2 rounded-lg transition-colors ${
+                          currentPage === page
+                            ? 'bg-blue-600 text-white'
+                            : 'border border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <button
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="flex items-center gap-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    التالي
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
