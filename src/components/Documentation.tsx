@@ -872,6 +872,90 @@ if (!result.success) {
               </div>
             </div>
           </section>
+
+          <section className="bg-white rounded-xl shadow-sm p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">إعداد Ko-fi Webhook</h2>
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-3">نظرة عامة</h3>
+                <p className="text-gray-700 mb-4">
+                  تم إضافة تكامل Ko-fi Webhook الذي يسمح بمعالجة المدفوعات والتبرعات تلقائياً وإنشاء تراخيص
+                  للمستخدمين بناءً على المبلغ المدفوع.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-3">الخطوة 1: إعداد Verification Token</h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  قم بإنشاء Verification Token في Ko-fi وأضفه كـ Secret في Supabase:
+                </p>
+                <ol className="list-decimal list-inside text-sm space-y-2 bg-gray-50 p-4 rounded-lg">
+                  <li>اذهب إلى <a href="https://ko-fi.com/manage/webhooks" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">Ko-fi Webhooks Settings</a></li>
+                  <li>انسخ Verification Token من الإعدادات</li>
+                  <li>أضفه كـ Secret في Supabase باسم <code className="bg-gray-200 px-2 py-1 rounded font-mono text-xs">KOFI_VERIFICATION_TOKEN</code></li>
+                </ol>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-3">الخطوة 2: إعداد Webhook URL</h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  أضف رابط Edge Function في إعدادات Ko-fi:
+                </p>
+                <div className="bg-gray-900 text-gray-100 p-3 rounded-lg text-sm font-mono break-all">
+                  https://iwipefxjymkqpsuxkupo.supabase.co/functions/v1/kofi-webhook
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-3">الخطوة 3: اختبار Webhook</h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  استخدم أداة الاختبار في Ko-fi للتأكد من عمل Webhook بشكل صحيح. يمكنك مراجعة السجلات في
+                  لوحة التحكم الخاصة بك.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-3">كيف يعمل النظام</h3>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <ul className="list-disc list-inside text-sm space-y-2 text-gray-700">
+                    <li>عند استلام دفعة من Ko-fi، يتم إنشاء ترخيص تلقائياً</li>
+                    <li>مدة الترخيص تعتمد على المبلغ:
+                      <ul className="list-circle list-inside mr-6 mt-1 space-y-1">
+                        <li>$10 فأكثر = 365 يوم</li>
+                        <li>$5-$9 = 180 يوم</li>
+                        <li>أقل من $5 = 30 يوم</li>
+                      </ul>
+                    </li>
+                    <li>إذا وجد حساب بنفس البريد الإلكتروني، يتم تفعيل الترخيص تلقائياً</li>
+                    <li>إذا لم يوجد حساب، يُحفظ الترخيص لحين إنشاء المستخدم لحسابه</li>
+                    <li>يمكنك متابعة جميع الطلبات من قسم "طلبات Ko-fi" في لوحة التحكم</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-3">تحقق من التكامل</h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  للتأكد من أن التكامل يعمل بشكل صحيح:
+                </p>
+                <ol className="list-decimal list-inside text-sm space-y-2 bg-gray-50 p-4 rounded-lg">
+                  <li>أرسل اختباراً من Ko-fi Dashboard</li>
+                  <li>تحقق من قسم "طلبات Ko-fi" في لوحة التحكم</li>
+                  <li>راجع السجلات في Supabase Edge Functions إذا كانت هناك مشاكل</li>
+                </ol>
+              </div>
+
+              <div className="bg-yellow-50 border-r-4 border-yellow-400 p-4 rounded-lg">
+                <p className="font-bold text-yellow-900 mb-2">⚠️ ملاحظات مهمة:</p>
+                <ul className="list-disc list-inside space-y-1 text-yellow-800 text-sm">
+                  <li>تأكد من إضافة KOFI_VERIFICATION_TOKEN في Supabase Secrets</li>
+                  <li>Webhook لا يتطلب JWT verification لأنه يستقبل طلبات من Ko-fi مباشرة</li>
+                  <li>يتم التحقق من صحة الطلب باستخدام verification_token</li>
+                  <li>جميع البيانات مشفرة ومحمية في قاعدة البيانات</li>
+                </ul>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </div>

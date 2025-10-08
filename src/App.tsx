@@ -4,9 +4,10 @@ import AdminLoginForm from './components/AdminLoginForm';
 import AdminDashboard from './components/AdminDashboard';
 import AdminProfile from './components/AdminProfile';
 import Documentation from './components/Documentation';
-import { BookOpen, LayoutDashboard, LogOut, Shield, UserCircle } from 'lucide-react';
+import KofiOrders from './components/KofiOrders';
+import { BookOpen, LayoutDashboard, LogOut, Shield, UserCircle, ShoppingCart } from 'lucide-react';
 
-type View = 'dashboard' | 'docs' | 'profile';
+type View = 'dashboard' | 'docs' | 'profile' | 'kofi';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -123,6 +124,18 @@ function App() {
               </button>
 
               <button
+                onClick={() => setCurrentView('kofi')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  currentView === 'kofi'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <ShoppingCart className="w-4 h-4" />
+                طلبات Ko-fi
+              </button>
+
+              <button
                 onClick={() => setCurrentView('docs')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
                   currentView === 'docs'
@@ -159,6 +172,7 @@ function App() {
       </nav>
 
       {currentView === 'dashboard' && <AdminDashboard />}
+      {currentView === 'kofi' && <KofiOrders />}
       {currentView === 'docs' && <Documentation />}
       {currentView === 'profile' && <AdminProfile />}
     </div>
