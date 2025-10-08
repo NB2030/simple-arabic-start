@@ -190,6 +190,22 @@ export default function AdminDashboard() {
     }
   };
 
+  const calculateDaysRemaining = (expiresAt: string): number => {
+    const today = new Date();
+    const expiryDate = new Date(expiresAt);
+    const diffTime = expiryDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const formatDate = (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString('en-GB', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  };
+
   // Filter and paginate user licenses
   const filteredUserLicenses = userLicenses.filter((userLicense) => {
     const searchLower = searchQuery.toLowerCase();
@@ -465,6 +481,9 @@ export default function AdminDashboard() {
                     تاريخ الانتهاء
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    الأيام المتبقية
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     الحالة
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -475,7 +494,7 @@ export default function AdminDashboard() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {paginatedUserLicenses.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                       {searchQuery ? 'لا توجد نتائج للبحث' : 'لا توجد تراخيص مفعلة بعد'}
                     </td>
                   </tr>
@@ -496,7 +515,7 @@ export default function AdminDashboard() {
                             </code>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {userLicense.activated_at ? new Date(userLicense.activated_at).toLocaleDateString('ar-SA') : '-'}
+                            {userLicense.activated_at ? formatDate(userLicense.activated_at) : '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <input
@@ -505,6 +524,22 @@ export default function AdminDashboard() {
                               onChange={(e) => setEditFormData({ ...editFormData, expires_at: e.target.value })}
                               className="px-2 py-1 border border-gray-300 rounded text-sm"
                             />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {(() => {
+                              const daysLeft = calculateDaysRemaining(userLicense.expires_at);
+                              if (daysLeft < 0) {
+                                return <span className="text-red-600 font-semibold">منتهي</span>;
+                              } else if (daysLeft === 0) {
+                                return <span className="text-orange-600 font-semibold">ينتهي اليوم</span>;
+                              } else if (daysLeft <= 7) {
+                                return <span className="text-orange-600 font-semibold">{daysLeft} يوم</span>;
+                              } else if (daysLeft <= 30) {
+                                return <span className="text-yellow-600 font-semibold">{daysLeft} يوم</span>;
+                              } else {
+                                return <span className="text-green-600 font-semibold">{daysLeft} يوم</span>;
+                              }
+                            })()}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <select
@@ -549,10 +584,26 @@ export default function AdminDashboard() {
                             </code>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {userLicense.activated_at ? new Date(userLicense.activated_at).toLocaleDateString('ar-SA') : '-'}
+                            {userLicense.activated_at ? formatDate(userLicense.activated_at) : '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {new Date(userLicense.expires_at).toLocaleDateString('ar-SA')}
+                            {formatDate(userLicense.expires_at)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            {(() => {
+                              const daysLeft = calculateDaysRemaining(userLicense.expires_at);
+                              if (daysLeft < 0) {
+                                return <span className="text-red-600 font-semibold">منتهي</span>;
+                              } else if (daysLeft === 0) {
+                                return <span className="text-orange-600 font-semibold">ينتهي اليوم</span>;
+                              } else if (daysLeft <= 7) {
+                                return <span className="text-orange-600 font-semibold">{daysLeft} يوم</span>;
+                              } else if (daysLeft <= 30) {
+                                return <span className="text-yellow-600 font-semibold">{daysLeft} يوم</span>;
+                              } else {
+                                return <span className="text-green-600 font-semibold">{daysLeft} يوم</span>;
+                              }
+                            })()}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {userLicense.is_active &&
