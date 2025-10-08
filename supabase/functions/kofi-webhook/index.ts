@@ -130,29 +130,29 @@ Deno.serve(async (req: Request) => {
     let shouldCreateLicense = true;
 
     if (data.shop_items && data.shop_items.length > 0) {
-      // Shop Order - match by product_identifier
+      // Shop Order - match by direct_link_code for digital products
       const firstItem = data.shop_items[0];
-      const productId = firstItem.variation_name || firstItem.direct_link_code;
-      console.log('Shop item - product identifier:', productId);
+      const productCode = firstItem.direct_link_code;
+      console.log('Shop item - direct link code:', productCode);
 
       // Look for product-type pricing tier
       const { data: productTier } = await supabase
         .from('pricing_tiers')
         .select('*')
         .eq('tier_type', 'product')
-        .eq('product_identifier', productId)
+        .eq('product_identifier', productCode)
         .eq('is_active', true)
         .maybeSingle();
 
       if (productTier) {
         durationDays = productTier.duration_days;
         tierUsed = productTier.name;
-        console.log('Matched product tier:', tierUsed);
+        console.log('Matched product tier:', tierUsed, 'with code:', productCode);
       } else {
         // No matching product tier found
         shouldCreateLicense = false;
         tierUsed = '-';
-        console.log('No product tier found for:', productId);
+        console.log('No product tier found for direct_link_code:', productCode);
       }
     } else {
       // Donation - match by amount with donation-type tiers

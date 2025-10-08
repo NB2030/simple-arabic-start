@@ -240,15 +240,18 @@ export default function PricingTiers() {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          معرّف المنتج *
+                          كود المنتج (Direct Link Code) *
                         </label>
                         <input
                           type="text"
                           value={formData.product_identifier}
                           onChange={(e) => setFormData({ ...formData, product_identifier: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          placeholder="مثل: Blue, Large"
+                          placeholder="مثل: abc123def"
                         />
+                        <p className="text-xs text-gray-500 mt-1">
+                          من رابط المنتج: ko-fi.com/s/[الكود]
+                        </p>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">

@@ -298,7 +298,7 @@ export type Database = {
       }
     }
     Enums: {
-      pricing_tier_type: "product" | "donation"
+      pricing_tier_type: "donation" | "product"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -426,7 +426,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      pricing_tier_type: ["product", "donation"],
+      pricing_tier_type: ["donation", "product"],
     },
   },
 } as const
