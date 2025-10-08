@@ -45,20 +45,17 @@ export default function AdminDashboard() {
   };
 
   const generateLicenseKey = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const segments = 4;
-    const segmentLength = 5;
-    const key = [];
-
-    for (let i = 0; i < segments; i++) {
-      let segment = '';
-      for (let j = 0; j < segmentLength; j++) {
-        segment += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      key.push(segment);
-    }
-
-    return key.join('-');
+    // Use cryptographically secure random number generation
+    const array = new Uint8Array(10); // 10 bytes = 80 bits of entropy
+    window.crypto.getRandomValues(array);
+    
+    const hex = Array.from(array)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('')
+      .toUpperCase();
+      
+    // Format as XXXXX-XXXXX-XXXXX-XXXXX
+    return `${hex.slice(0,5)}-${hex.slice(5,10)}-${hex.slice(10,15)}-${hex.slice(15,20)}`;
   };
 
   const createLicense = async () => {

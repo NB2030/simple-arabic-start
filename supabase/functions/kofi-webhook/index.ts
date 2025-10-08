@@ -1,10 +1,78 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.74.0';
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
+
+// Zod schema for Ko-fi webhook validation
+const kofiWebhookSchema = z.object({
+  verification_token: z.string().min(1),
+  message_id: z.string().min(1).max(255),
+  timestamp: z.string(),
+  type: z.enum(['Donation', 'Subscription', 'Shop Order', 'Commission']),
+  from_name: z.string().max(255),
+  email: z.string().email().max(255),
+  amount: z.string().regex(/^\d+(\.\d{1,2})?$/),
+  currency: z.string().length(3),
+  is_public: z.boolean(),
+  url: z.string().max(500),
+  message: z.string().max(1000).nullable().optional(),
+  is_subscription_payment: z.boolean(),
+  is_first_subscription_payment: z.boolean(),
+  kofi_transaction_id: z.string().max(255).optional(),
+  shop_items: z.array(z.object({
+    direct_link_code: z.string().max(100),
+    variation_name: z.string().max(255),
+    quantity: z.number().int().positive()
+  })).optional(),
+  tier_name: z.string().max(255).nullable().optional(),
+  shipping: z.object({
+    full_name: z.string().max(255),
+    street_address: z.string().max(500),
+    city: z.string().max(100),
+    state_or_province: z.string().max(100),
+    postal_code: z.string().max(20),
+    country: z.string().max(100),
+    country_code: z.string().max(10),
+    telephone: z.string().max(50)
+  }).nullable().optional()
+});
+
+// Sanitize text to prevent XSS (basic implementation)
+function sanitizeText(text: string | null | undefined): string | null {
+  if (!text) return null;
+  // Remove HTML tags and limit length
+  return text.replace(/<[^>]*>/g, '').slice(0, 1000);
+}
+
+// Generate cryptographically secure license key
+function generateSecureLicenseKey(): string {
+  const array = new Uint8Array(12); // 12 bytes = 96 bits of entropy
+  crypto.getRandomValues(array);
+  
+  const hex = Array.from(array)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase();
+    
+  // Format as XXXXX-XXXXX-XXXXX-XXXXX
+  return `${hex.slice(0,5)}-${hex.slice(5,10)}-${hex.slice(10,15)}-${hex.slice(15,20)}`;
+}
+
+// Map errors to safe user messages
+function getSafeErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes('duplicate key')) return 'This item already exists';
+    if (msg.includes('foreign key')) return 'Referenced item not found';
+    if (msg.includes('permission denied')) return 'Access denied';
+    if (msg.includes('violates row-level security')) return 'Access denied';
+  }
+  return 'An error occurred processing your request';
+}
 
 interface KofiWebhookData {
   verification_token: string;
@@ -61,18 +129,29 @@ Deno.serve(async (req: Request) => {
     if (!dataString) {
       console.error('No data in webhook');
       return new Response(
-        JSON.stringify({ error: 'No data provided' }),
+        JSON.stringify({ error: 'Invalid request format' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const data: KofiWebhookData = JSON.parse(dataString);
-    console.log('Parsed Ko-fi data:', { 
-      email: data.email, 
-      amount: data.amount, 
-      type: data.type,
-      message_id: data.message_id 
-    });
+    // Parse and validate webhook data
+    let data;
+    try {
+      const parsed = JSON.parse(dataString);
+      data = kofiWebhookSchema.parse(parsed);
+      console.log('Validated Ko-fi data:', { 
+        email: data.email, 
+        amount: data.amount, 
+        type: data.type,
+        message_id: data.message_id 
+      });
+    } catch (validationError) {
+      console.error('Invalid webhook data format:', validationError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid webhook data format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Verify token
     if (data.verification_token !== verificationToken) {
@@ -185,8 +264,8 @@ Deno.serve(async (req: Request) => {
     let newLicense: any = null;
 
     if (shouldCreateLicense) {
-      // Create license for the purchase
-      licenseKey = `KOFI-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+      // Create license for the purchase with cryptographically secure key
+      licenseKey = `KOFI-${generateSecureLicenseKey()}`;
 
       const { data: created, error: licenseError } = await supabase
         .from('licenses')
@@ -212,7 +291,7 @@ Deno.serve(async (req: Request) => {
       console.log('No matching pricing tier - recording order without license');
     }
 
-    // Store Ko-fi order (license_id may be null)
+    // Store Ko-fi order with sanitized text fields
     const { error: orderError } = await supabase
       .from('kofi_orders')
       .insert({
@@ -221,8 +300,8 @@ Deno.serve(async (req: Request) => {
         timestamp: data.timestamp,
         type: data.type,
         is_public: data.is_public,
-        from_name: data.from_name,
-        message: data.message,
+        from_name: sanitizeText(data.from_name),
+        message: sanitizeText(data.message),
         amount: data.amount,
         url: data.url,
         email: data.email.toLowerCase(),
@@ -289,9 +368,12 @@ Deno.serve(async (req: Request) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
+    // Log full error details server-side only
     console.error('Error processing Ko-fi webhook:', error);
+    
+    // Return safe error message to client
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      JSON.stringify({ error: getSafeErrorMessage(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
