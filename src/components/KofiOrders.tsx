@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../integrations/supabase/client';
-import { AlertCircle, CheckCircle, Package } from 'lucide-react';
+import { AlertCircle, CheckCircle, Package, Trash2 } from 'lucide-react';
+import { useToast } from '../hooks/use-toast';
 
 interface KofiOrder {
   id: string;
@@ -24,6 +25,7 @@ interface KofiOrder {
 export default function KofiOrders() {
   const [orders, setOrders] = useState<KofiOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     loadOrders();
@@ -43,6 +45,30 @@ export default function KofiOrders() {
       console.error('Error loading Ko-fi orders:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const deleteOrder = async (id: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذا الطلب؟')) return;
+
+    try {
+      const { error } = await supabase.from('kofi_orders').delete().eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "نجح",
+        description: "تم حذف الطلب بنجاح"
+      });
+      
+      loadOrders();
+    } catch (error) {
+      console.error('Error deleting order:', error);
+      toast({
+        variant: "destructive",
+        title: "خطأ",
+        description: "فشل حذف الطلب"
+      });
     }
   };
 
@@ -70,7 +96,7 @@ export default function KofiOrders() {
       <div className="grid gap-4">
         {orders.map((order) => (
           <div key={order.id} className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex items-start justify-between">
+            <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   {order.processed ? (
@@ -126,6 +152,14 @@ export default function KofiOrders() {
                   </div>
                 </div>
               </div>
+              
+              <button
+                onClick={() => deleteOrder(order.id)}
+                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+                title="حذف الطلب"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
             </div>
           </div>
         ))}

@@ -5,9 +5,10 @@ import AdminDashboard from './components/AdminDashboard';
 import AdminProfile from './components/AdminProfile';
 import Documentation from './components/Documentation';
 import KofiOrders from './components/KofiOrders';
-import { BookOpen, LayoutDashboard, LogOut, Shield, UserCircle, ShoppingCart } from 'lucide-react';
+import PricingTiers from './components/PricingTiers';
+import { BookOpen, LayoutDashboard, LogOut, Shield, UserCircle, ShoppingCart, DollarSign } from 'lucide-react';
 
-type View = 'dashboard' | 'docs' | 'profile' | 'kofi';
+type View = 'dashboard' | 'docs' | 'profile' | 'kofi' | 'pricing';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -136,6 +137,18 @@ function App() {
               </button>
 
               <button
+                onClick={() => setCurrentView('pricing')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  currentView === 'pricing'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <DollarSign className="w-4 h-4" />
+                فئات التسعير
+              </button>
+
+              <button
                 onClick={() => setCurrentView('docs')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
                   currentView === 'docs'
@@ -173,6 +186,7 @@ function App() {
 
       {currentView === 'dashboard' && <AdminDashboard />}
       {currentView === 'kofi' && <KofiOrders />}
+      {currentView === 'pricing' && <PricingTiers />}
       {currentView === 'docs' && <Documentation />}
       {currentView === 'profile' && <AdminProfile />}
     </div>

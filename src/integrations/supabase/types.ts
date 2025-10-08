@@ -181,6 +181,33 @@ export type Database = {
         }
         Relationships: []
       }
+      pricing_tiers: {
+        Row: {
+          amount: number
+          created_at: string | null
+          duration_days: number
+          id: string
+          is_active: boolean | null
+          name: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          duration_days: number
+          id?: string
+          is_active?: boolean | null
+          name: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          duration_days?: number
+          id?: string
+          is_active?: boolean | null
+          name?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null

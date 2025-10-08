@@ -107,11 +107,22 @@ Deno.serve(async (req: Request) => {
 
     console.log('User found:', profile ? 'Yes' : 'No');
 
+    // Get pricing tier based on amount
+    const amount = parseFloat(data.amount);
+    
+    const { data: pricingTiers } = await supabase
+      .from('pricing_tiers')
+      .select('*')
+      .lte('amount', amount)
+      .eq('is_active', true)
+      .order('amount', { ascending: false })
+      .limit(1);
+
+    const tier = pricingTiers?.[0];
+    const durationDays = tier?.duration_days || 30;
+
     // Create license for the purchase
     const licenseKey = `KOFI-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
-    
-    const amount = parseFloat(data.amount);
-    const durationDays = amount >= 10 ? 365 : amount >= 5 ? 180 : 30;
 
     const { data: newLicense, error: licenseError } = await supabase
       .from('licenses')
