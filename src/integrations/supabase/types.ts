@@ -62,6 +62,89 @@ export type Database = {
         }
         Relationships: []
       }
+      kofi_orders: {
+        Row: {
+          amount: string
+          created_at: string | null
+          currency: string | null
+          email: string
+          from_name: string | null
+          id: string
+          is_first_subscription_payment: boolean | null
+          is_public: boolean | null
+          is_subscription_payment: boolean | null
+          kofi_transaction_id: string | null
+          license_id: string | null
+          message: string | null
+          message_id: string
+          processed: boolean | null
+          shipping: Json | null
+          shop_items: Json | null
+          tier_name: string | null
+          timestamp: string
+          type: string
+          url: string | null
+          user_id: string | null
+          verification_token: string
+        }
+        Insert: {
+          amount: string
+          created_at?: string | null
+          currency?: string | null
+          email: string
+          from_name?: string | null
+          id?: string
+          is_first_subscription_payment?: boolean | null
+          is_public?: boolean | null
+          is_subscription_payment?: boolean | null
+          kofi_transaction_id?: string | null
+          license_id?: string | null
+          message?: string | null
+          message_id: string
+          processed?: boolean | null
+          shipping?: Json | null
+          shop_items?: Json | null
+          tier_name?: string | null
+          timestamp: string
+          type: string
+          url?: string | null
+          user_id?: string | null
+          verification_token: string
+        }
+        Update: {
+          amount?: string
+          created_at?: string | null
+          currency?: string | null
+          email?: string
+          from_name?: string | null
+          id?: string
+          is_first_subscription_payment?: boolean | null
+          is_public?: boolean | null
+          is_subscription_payment?: boolean | null
+          kofi_transaction_id?: string | null
+          license_id?: string | null
+          message?: string | null
+          message_id?: string
+          processed?: boolean | null
+          shipping?: Json | null
+          shop_items?: Json | null
+          tier_name?: string | null
+          timestamp?: string
+          type?: string
+          url?: string | null
+          user_id?: string | null
+          verification_token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kofi_orders_license_id_fkey"
+            columns: ["license_id"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       licenses: {
         Row: {
           created_at: string | null
