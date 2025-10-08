@@ -83,19 +83,36 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Check if already processed
+    // Check if already processed by message_id (idempotency)
     const { data: existingOrder } = await supabase
       .from('kofi_orders')
-      .select('id')
+      .select('id, license_id')
       .eq('message_id', data.message_id)
       .maybeSingle();
 
     if (existingOrder) {
-      console.log('Order already processed:', data.message_id);
+      console.log('Order already processed (message_id):', data.message_id);
       return new Response(
         JSON.stringify({ success: true, message: 'Order already processed' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Additional idempotency: check by kofi_transaction_id
+    if (data.kofi_transaction_id) {
+      const { data: existingByTxn } = await supabase
+        .from('kofi_orders')
+        .select('id, license_id')
+        .eq('kofi_transaction_id', data.kofi_transaction_id)
+        .maybeSingle();
+
+      if (existingByTxn) {
+        console.log('Order already processed (kofi_transaction_id):', data.kofi_transaction_id);
+        return new Response(
+          JSON.stringify({ success: true, message: 'Order already processed' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Find user by email
@@ -110,6 +127,7 @@ Deno.serve(async (req: Request) => {
     // Determine duration based on shop items or amount
     let durationDays = 30; // default
     let tierUsed = 'افتراضي';
+    let shouldCreateLicense = true;
 
     if (data.shop_items && data.shop_items.length > 0) {
       // Try to match by variation_name or direct_link_code
@@ -135,56 +153,76 @@ Deno.serve(async (req: Request) => {
           .from('pricing_tiers')
           .select('*')
           .lte('amount', amount)
+          .gt('amount', 0)
           .eq('is_active', true)
           .order('amount', { ascending: false })
           .limit(1);
 
         const tier = pricingTiers?.[0];
-        durationDays = tier?.duration_days || 30;
-        tierUsed = tier?.name || 'افتراضي';
+        if (tier) {
+          durationDays = tier.duration_days;
+          tierUsed = tier.name;
+        } else {
+          shouldCreateLicense = false;
+          tierUsed = '-';
+        }
       }
     } else {
-      // Regular donation - use amount-based pricing
+      // Regular donation - only create license if a matching amount tier (>0) exists
       const amount = parseFloat(data.amount);
       const { data: pricingTiers } = await supabase
         .from('pricing_tiers')
         .select('*')
         .lte('amount', amount)
+        .gt('amount', 0)
         .eq('is_active', true)
         .order('amount', { ascending: false })
         .limit(1);
 
       const tier = pricingTiers?.[0];
-      durationDays = tier?.duration_days || 30;
-      tierUsed = tier?.name || 'افتراضي';
+      if (tier) {
+        durationDays = tier.duration_days;
+        tierUsed = tier.name;
+      } else {
+        shouldCreateLicense = false;
+        tierUsed = '-';
+      }
     }
 
-    console.log('Duration days:', durationDays, 'Tier:', tierUsed);
+    console.log('Duration days:', durationDays, 'Tier:', tierUsed, 'Create?', shouldCreateLicense);
 
-    // Create license for the purchase
-    const licenseKey = `KOFI-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+    let licenseKey: string | null = null;
+    let newLicense: any = null;
 
-    const { data: newLicense, error: licenseError } = await supabase
-      .from('licenses')
-      .insert({
-        license_key: licenseKey,
-        duration_days: durationDays,
-        max_activations: 1,
-        current_activations: 0,
-        is_active: true,
-        notes: `Ko-fi ${data.type} - ${data.from_name} - ${data.amount} ${data.currency} - ${tierUsed}`,
-      })
-      .select()
-      .single();
+    if (shouldCreateLicense) {
+      // Create license for the purchase
+      licenseKey = `KOFI-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
-    if (licenseError) {
-      console.error('Error creating license:', licenseError);
-      throw licenseError;
+      const { data: created, error: licenseError } = await supabase
+        .from('licenses')
+        .insert({
+          license_key: licenseKey,
+          duration_days: durationDays,
+          max_activations: 1,
+          current_activations: 0,
+          is_active: true,
+          notes: `Ko-fi ${data.type} - ${data.from_name} - ${data.amount} ${data.currency} - ${tierUsed}`,
+        })
+        .select()
+        .single();
+
+      if (licenseError) {
+        console.error('Error creating license:', licenseError);
+        throw licenseError;
+      }
+
+      newLicense = created;
+      console.log('License created:', licenseKey);
+    } else {
+      console.log('No matching pricing tier - recording order without license');
     }
 
-    console.log('License created:', licenseKey);
-
-    // Store Ko-fi order
+    // Store Ko-fi order (license_id may be null)
     const { error: orderError } = await supabase
       .from('kofi_orders')
       .insert({
@@ -205,7 +243,7 @@ Deno.serve(async (req: Request) => {
         shop_items: data.shop_items,
         tier_name: data.tier_name,
         shipping: data.shipping,
-        license_id: newLicense.id,
+        license_id: newLicense ? newLicense.id : null,
         user_id: profile?.id || null,
         processed: false,
       });
@@ -216,7 +254,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // If user exists, activate license automatically
-    if (profile) {
+    if (profile && newLicense) {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + durationDays);
 
@@ -246,17 +284,17 @@ Deno.serve(async (req: Request) => {
           .update({ processed: true })
           .eq('message_id', data.message_id);
       }
-    } else {
-      console.log('No user found - license created but not activated');
+    } else if (!profile) {
+      console.log('No user found - license (if created) not activated');
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Payment processed successfully',
+        message: shouldCreateLicense ? 'Payment processed successfully' : 'Order recorded without license (no matching tier)',
         license_key: licenseKey,
         user_found: !!profile,
-        auto_activated: !!profile,
+        auto_activated: !!profile && !!newLicense,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
