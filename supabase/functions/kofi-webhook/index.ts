@@ -27,7 +27,7 @@ const kofiWebhookSchema = z.object({
     direct_link_code: z.string().max(100),
     variation_name: z.string().max(255),
     quantity: z.number().int().positive()
-  })).nullable().optional(),
+  })).optional(),
   tier_name: z.string().max(255).nullable().optional(),
   shipping: z.object({
     full_name: z.string().max(255),
