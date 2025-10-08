@@ -130,62 +130,52 @@ Deno.serve(async (req: Request) => {
     let shouldCreateLicense = true;
 
     if (data.shop_items && data.shop_items.length > 0) {
-      // Try to match by variation_name or direct_link_code
+      // Shop Order - match by product_identifier
       const firstItem = data.shop_items[0];
-      console.log('Shop item:', firstItem);
+      const productId = firstItem.variation_name || firstItem.direct_link_code;
+      console.log('Shop item - product identifier:', productId);
 
-      // Check if variation_name or direct_link_code matches a pricing tier
-      const { data: tierByName } = await supabase
+      // Look for product-type pricing tier
+      const { data: productTier } = await supabase
         .from('pricing_tiers')
         .select('*')
-        .ilike('name', `%${firstItem.variation_name || firstItem.direct_link_code}%`)
+        .eq('tier_type', 'product')
+        .eq('product_identifier', productId)
         .eq('is_active', true)
         .maybeSingle();
 
-      if (tierByName) {
-        durationDays = tierByName.duration_days;
-        tierUsed = tierByName.name;
-        console.log('Matched tier by name:', tierUsed);
+      if (productTier) {
+        durationDays = productTier.duration_days;
+        tierUsed = productTier.name;
+        console.log('Matched product tier:', tierUsed);
       } else {
-        // Fallback to amount-based pricing
-        const amount = parseFloat(data.amount);
-        const { data: pricingTiers } = await supabase
-          .from('pricing_tiers')
-          .select('*')
-          .lte('amount', amount)
-          .gt('amount', 0)
-          .eq('is_active', true)
-          .order('amount', { ascending: false })
-          .limit(1);
-
-        const tier = pricingTiers?.[0];
-        if (tier) {
-          durationDays = tier.duration_days;
-          tierUsed = tier.name;
-        } else {
-          shouldCreateLicense = false;
-          tierUsed = '-';
-        }
+        // No matching product tier found
+        shouldCreateLicense = false;
+        tierUsed = '-';
+        console.log('No product tier found for:', productId);
       }
     } else {
-      // Regular donation - only create license if a matching amount tier (>0) exists
+      // Donation - match by amount with donation-type tiers
       const amount = parseFloat(data.amount);
-      const { data: pricingTiers } = await supabase
+      const { data: donationTiers } = await supabase
         .from('pricing_tiers')
         .select('*')
+        .eq('tier_type', 'donation')
         .lte('amount', amount)
         .gt('amount', 0)
         .eq('is_active', true)
         .order('amount', { ascending: false })
         .limit(1);
 
-      const tier = pricingTiers?.[0];
+      const tier = donationTiers?.[0];
       if (tier) {
         durationDays = tier.duration_days;
         tierUsed = tier.name;
+        console.log('Matched donation tier:', tierUsed, 'for amount:', amount);
       } else {
         shouldCreateLicense = false;
         tierUsed = '-';
+        console.log('No donation tier found for amount:', amount);
       }
     }
 

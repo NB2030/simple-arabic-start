@@ -189,6 +189,8 @@ export type Database = {
           id: string
           is_active: boolean | null
           name: string
+          product_identifier: string | null
+          tier_type: Database["public"]["Enums"]["pricing_tier_type"]
         }
         Insert: {
           amount: number
@@ -197,6 +199,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name: string
+          product_identifier?: string | null
+          tier_type?: Database["public"]["Enums"]["pricing_tier_type"]
         }
         Update: {
           amount?: number
@@ -205,6 +209,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name?: string
+          product_identifier?: string | null
+          tier_type?: Database["public"]["Enums"]["pricing_tier_type"]
         }
         Relationships: []
       }
@@ -292,7 +298,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      pricing_tier_type: "product" | "donation"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -419,6 +425,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      pricing_tier_type: ["product", "donation"],
+    },
   },
 } as const
