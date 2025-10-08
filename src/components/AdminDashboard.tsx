@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, License, UserLicenseWithDetails } from '../lib/supabase';
-import { Key, Users, Calendar, CheckCircle, XCircle, Plus, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Key, Users, Calendar, CheckCircle, XCircle, Plus, Trash2, Search, ChevronLeft, ChevronRight, Edit2, Save, X } from 'lucide-react';
+import { useToast } from '../hooks/use-toast';
 
 export default function AdminDashboard() {
   const [licenses, setLicenses] = useState<License[]>([]);
@@ -15,6 +16,10 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [editingLicenseId, setEditingLicenseId] = useState<string | null>(null);
+  const [editingUserLicenseId, setEditingUserLicenseId] = useState<string | null>(null);
+  const [editFormData, setEditFormData] = useState<any>({});
+  const { toast } = useToast();
 
   useEffect(() => {
     loadData();
@@ -95,17 +100,93 @@ export default function AdminDashboard() {
     }
   };
 
-  const toggleLicenseStatus = async (id: string, currentStatus: boolean) => {
+  const startEditLicense = (license: License) => {
+    setEditingLicenseId(license.id);
+    setEditFormData({
+      duration_days: license.duration_days,
+      max_activations: license.max_activations,
+      notes: license.notes || '',
+      is_active: license.is_active,
+    });
+  };
+
+  const cancelEditLicense = () => {
+    setEditingLicenseId(null);
+    setEditFormData({});
+  };
+
+  const saveLicense = async (id: string) => {
     try {
       const { error } = await supabase
         .from('licenses')
-        .update({ is_active: !currentStatus })
+        .update({
+          duration_days: editFormData.duration_days,
+          max_activations: editFormData.max_activations,
+          notes: editFormData.notes,
+          is_active: editFormData.is_active,
+        })
         .eq('id', id);
 
       if (error) throw error;
+
+      toast({
+        title: "نجح",
+        description: "تم تحديث الترخيص بنجاح"
+      });
+
+      setEditingLicenseId(null);
+      setEditFormData({});
       loadData();
     } catch (error) {
       console.error('Error updating license:', error);
+      toast({
+        variant: "destructive",
+        title: "خطأ",
+        description: "فشل تحديث الترخيص"
+      });
+    }
+  };
+
+  const startEditUserLicense = (userLicense: UserLicenseWithDetails) => {
+    setEditingUserLicenseId(userLicense.id);
+    setEditFormData({
+      expires_at: new Date(userLicense.expires_at).toISOString().split('T')[0],
+      is_active: userLicense.is_active,
+    });
+  };
+
+  const cancelEditUserLicense = () => {
+    setEditingUserLicenseId(null);
+    setEditFormData({});
+  };
+
+  const saveUserLicense = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_licenses')
+        .update({
+          expires_at: editFormData.expires_at,
+          is_active: editFormData.is_active,
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "نجح",
+        description: "تم تحديث ترخيص المستخدم بنجاح"
+      });
+
+      setEditingUserLicenseId(null);
+      setEditFormData({});
+      loadData();
+    } catch (error) {
+      console.error('Error updating user license:', error);
+      toast({
+        variant: "destructive",
+        title: "خطأ",
+        description: "فشل تحديث ترخيص المستخدم"
+      });
     }
   };
 
@@ -229,44 +310,115 @@ export default function AdminDashboard() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {licenses.map((license) => (
                   <tr key={license.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <code className="px-2 py-1 bg-gray-100 rounded text-sm font-mono">
-                        {license.license_key}
-                      </code>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {license.duration_days}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {license.current_activations} / {license.max_activations}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <button
-                        onClick={() => toggleLicenseStatus(license.id, license.is_active ?? false)}
-                        className="flex items-center gap-1"
-                      >
-                        {license.is_active ? (
-                          <>
-                            <CheckCircle className="w-5 h-5 text-green-600" />
-                            <span className="text-sm text-green-600">نشط</span>
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="w-5 h-5 text-red-600" />
-                            <span className="text-sm text-red-600">غير نشط</span>
-                          </>
-                        )}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{license.notes || '-'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <button
-                        onClick={() => deleteLicense(license.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </td>
+                    {editingLicenseId === license.id ? (
+                      <>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <code className="px-2 py-1 bg-gray-100 rounded text-sm font-mono">
+                            {license.license_key}
+                          </code>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="number"
+                            value={editFormData.duration_days}
+                            onChange={(e) => setEditFormData({ ...editFormData, duration_days: parseInt(e.target.value) })}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="number"
+                            value={editFormData.max_activations}
+                            onChange={(e) => setEditFormData({ ...editFormData, max_activations: parseInt(e.target.value) })}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                          />
+                          <span className="text-xs text-gray-500 mr-1">/ {license.current_activations}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <select
+                            value={editFormData.is_active ? 'true' : 'false'}
+                            onChange={(e) => setEditFormData({ ...editFormData, is_active: e.target.value === 'true' })}
+                            className="px-2 py-1 border border-gray-300 rounded text-sm"
+                          >
+                            <option value="true">نشط</option>
+                            <option value="false">غير نشط</option>
+                          </select>
+                        </td>
+                        <td className="px-6 py-4">
+                          <input
+                            type="text"
+                            value={editFormData.notes}
+                            onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            placeholder="ملاحظات..."
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => saveLicense(license.id)}
+                              className="p-1 text-green-600 hover:bg-green-50 rounded"
+                              title="حفظ"
+                            >
+                              <Save className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={cancelEditLicense}
+                              className="p-1 text-gray-600 hover:bg-gray-50 rounded"
+                              title="إلغاء"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <code className="px-2 py-1 bg-gray-100 rounded text-sm font-mono">
+                            {license.license_key}
+                          </code>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {license.duration_days}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {license.current_activations} / {license.max_activations}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {license.is_active ? (
+                            <span className="flex items-center gap-1 text-green-600">
+                              <CheckCircle className="w-4 h-4" />
+                              <span className="text-sm">نشط</span>
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-red-600">
+                              <XCircle className="w-4 h-4" />
+                              <span className="text-sm">غير نشط</span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500">{license.notes || '-'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => startEditLicense(license)}
+                              className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                              title="تحرير"
+                            >
+                              <Edit2 className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={() => deleteLicense(license.id)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded"
+                              title="حذف"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -315,49 +467,118 @@ export default function AdminDashboard() {
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     الحالة
                   </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    إجراءات
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {paginatedUserLicenses.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                       {searchQuery ? 'لا توجد نتائج للبحث' : 'لا توجد تراخيص مفعلة بعد'}
                     </td>
                   </tr>
                 ) : (
                   paginatedUserLicenses.map((userLicense) => (
                     <tr key={userLicense.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {userLicense.profiles?.full_name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {userLicense.profiles?.email}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <code className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
-                          {userLicense.licenses?.license_key}
-                        </code>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {userLicense.activated_at ? new Date(userLicense.activated_at).toLocaleDateString('ar-SA') : '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {new Date(userLicense.expires_at).toLocaleDateString('ar-SA')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {userLicense.is_active &&
-                        new Date(userLicense.expires_at) > new Date() ? (
-                          <span className="flex items-center gap-1 text-green-600">
-                            <CheckCircle className="w-4 h-4" />
-                            مفعل
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1 text-red-600">
-                            <XCircle className="w-4 h-4" />
-                            منتهي
-                          </span>
-                        )}
-                      </td>
+                      {editingUserLicenseId === userLicense.id ? (
+                        <>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {userLicense.profiles?.full_name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {userLicense.profiles?.email}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <code className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
+                              {userLicense.licenses?.license_key}
+                            </code>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {userLicense.activated_at ? new Date(userLicense.activated_at).toLocaleDateString('ar-SA') : '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <input
+                              type="date"
+                              value={editFormData.expires_at}
+                              onChange={(e) => setEditFormData({ ...editFormData, expires_at: e.target.value })}
+                              className="px-2 py-1 border border-gray-300 rounded text-sm"
+                            />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <select
+                              value={editFormData.is_active ? 'true' : 'false'}
+                              onChange={(e) => setEditFormData({ ...editFormData, is_active: e.target.value === 'true' })}
+                              className="px-2 py-1 border border-gray-300 rounded text-sm"
+                            >
+                              <option value="true">مفعل</option>
+                              <option value="false">معطل</option>
+                            </select>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => saveUserLicense(userLicense.id)}
+                                className="p-1 text-green-600 hover:bg-green-50 rounded"
+                                title="حفظ"
+                              >
+                                <Save className="w-5 h-5" />
+                              </button>
+                              <button
+                                onClick={cancelEditUserLicense}
+                                className="p-1 text-gray-600 hover:bg-gray-50 rounded"
+                                title="إلغاء"
+                              >
+                                <X className="w-5 h-5" />
+                              </button>
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {userLicense.profiles?.full_name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {userLicense.profiles?.email}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <code className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
+                              {userLicense.licenses?.license_key}
+                            </code>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {userLicense.activated_at ? new Date(userLicense.activated_at).toLocaleDateString('ar-SA') : '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {new Date(userLicense.expires_at).toLocaleDateString('ar-SA')}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {userLicense.is_active &&
+                            new Date(userLicense.expires_at) > new Date() ? (
+                              <span className="flex items-center gap-1 text-green-600">
+                                <CheckCircle className="w-4 h-4" />
+                                مفعل
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-red-600">
+                                <XCircle className="w-4 h-4" />
+                                منتهي
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button
+                              onClick={() => startEditUserLicense(userLicense)}
+                              className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                              title="تحرير"
+                            >
+                              <Edit2 className="w-5 h-5" />
+                            </button>
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))
                 )}
