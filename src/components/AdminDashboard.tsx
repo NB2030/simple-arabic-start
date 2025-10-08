@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, License, UserLicenseWithDetails } from '../lib/supabase';
-import { Key, Users, Calendar, CheckCircle, XCircle, Plus, Trash2, Search, ChevronLeft, ChevronRight, Edit2, Save, X } from 'lucide-react';
+import { Key, Users, Calendar, CheckCircle, XCircle, Plus, Trash2, Search, ChevronLeft, ChevronRight, Edit2, Save, X, RefreshCw } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 
 export default function AdminDashboard() {
@@ -19,6 +19,8 @@ export default function AdminDashboard() {
   const [editingLicenseId, setEditingLicenseId] = useState<string | null>(null);
   const [editingUserLicenseId, setEditingUserLicenseId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<any>({});
+  const [refreshingLicenses, setRefreshingLicenses] = useState(false);
+  const [refreshingUserLicenses, setRefreshingUserLicenses] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -70,6 +72,116 @@ export default function AdminDashboard() {
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshLicenses = async () => {
+    setRefreshingLicenses(true);
+    try {
+      // Get the most recent license timestamp
+      const lastCreatedAt = licenses.length > 0 ? licenses[0].created_at : null;
+      
+      let query = supabase
+        .from('licenses')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      // Only fetch new licenses if we have existing data
+      if (lastCreatedAt) {
+        query = query.gt('created_at', lastCreatedAt);
+      }
+      
+      const { data, error } = await query.limit(50);
+      
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        // Merge new licenses with existing ones
+        const updatedLicenses = [...data, ...licenses].slice(0, 50);
+        setLicenses(updatedLicenses);
+        
+        // Update cache
+        const cacheData = { 
+          licenses: updatedLicenses, 
+          userLicenses 
+        };
+        sessionStorage.setItem('admin_dashboard_cache', JSON.stringify(cacheData));
+        sessionStorage.setItem('admin_dashboard_cache_time', Date.now().toString());
+        
+        toast({
+          title: "تم التحديث",
+          description: `تم إضافة ${data.length} ترخيص جديد`
+        });
+      } else {
+        toast({
+          title: "لا يوجد جديد",
+          description: "لا توجد تراخيص جديدة"
+        });
+      }
+    } catch (error) {
+      console.error('Error refreshing licenses:', error);
+      toast({
+        variant: "destructive",
+        title: "خطأ",
+        description: "فشل تحديث التراخيص"
+      });
+    } finally {
+      setRefreshingLicenses(false);
+    }
+  };
+
+  const refreshUserLicenses = async () => {
+    setRefreshingUserLicenses(true);
+    try {
+      // Get the most recent user license timestamp
+      const lastActivatedAt = userLicenses.length > 0 ? userLicenses[0].activated_at : null;
+      
+      let query = supabase
+        .from('user_licenses')
+        .select('*, profiles(*), licenses(*)')
+        .order('activated_at', { ascending: false });
+      
+      // Only fetch new user licenses if we have existing data
+      if (lastActivatedAt) {
+        query = query.gt('activated_at', lastActivatedAt);
+      }
+      
+      const { data, error } = await query.limit(50);
+      
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        // Merge new user licenses with existing ones
+        const updatedUserLicenses = [...data, ...userLicenses].slice(0, 50);
+        setUserLicenses(updatedUserLicenses);
+        
+        // Update cache
+        const cacheData = { 
+          licenses, 
+          userLicenses: updatedUserLicenses 
+        };
+        sessionStorage.setItem('admin_dashboard_cache', JSON.stringify(cacheData));
+        sessionStorage.setItem('admin_dashboard_cache_time', Date.now().toString());
+        
+        toast({
+          title: "تم التحديث",
+          description: `تم إضافة ${data.length} ترخيص مستخدم جديد`
+        });
+      } else {
+        toast({
+          title: "لا يوجد جديد",
+          description: "لا توجد تراخيص مستخدمين جديدة"
+        });
+      }
+    } catch (error) {
+      console.error('Error refreshing user licenses:', error);
+      toast({
+        variant: "destructive",
+        title: "خطأ",
+        description: "فشل تحديث تراخيص المستخدمين"
+      });
+    } finally {
+      setRefreshingUserLicenses(false);
     }
   };
 
@@ -316,13 +428,24 @@ export default function AdminDashboard() {
         <div className="bg-white rounded-xl shadow-sm mb-8">
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-xl font-bold text-gray-900">التراخيص</h2>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              إنشاء ترخيص جديد
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={refreshLicenses}
+                disabled={refreshingLicenses}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                title="تحديث القائمة"
+              >
+                <RefreshCw className={`w-5 h-5 ${refreshingLicenses ? 'animate-spin' : ''}`} />
+                تحديث
+              </button>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                إنشاء ترخيص جديد
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -473,16 +596,29 @@ export default function AdminDashboard() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <h2 className="text-xl font-bold text-gray-900">المستخدمون والتراخيص</h2>
               
-              {/* Search Input */}
-              <div className="relative w-full sm:w-96">
-                <Search className="absolute right-3 top-3 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="البحث بالاسم أو البريد أو مفتاح الترخيص..."
-                  className="w-full pr-10 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+              <div className="flex gap-2 w-full sm:w-auto">
+                {/* Refresh Button */}
+                <button
+                  onClick={refreshUserLicenses}
+                  disabled={refreshingUserLicenses}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                  title="تحديث القائمة"
+                >
+                  <RefreshCw className={`w-5 h-5 ${refreshingUserLicenses ? 'animate-spin' : ''}`} />
+                  تحديث
+                </button>
+                
+                {/* Search Input */}
+                <div className="relative flex-1 sm:w-96">
+                  <Search className="absolute right-3 top-3 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="البحث بالاسم أو البريد أو مفتاح الترخيص..."
+                    className="w-full pr-10 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
               </div>
             </div>
           </div>
