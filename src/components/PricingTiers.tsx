@@ -29,6 +29,17 @@ export default function PricingTiers() {
   const { toast } = useToast();
 
   useEffect(() => {
+    // Load from cache first
+    const cachedTiers = sessionStorage.getItem('pricing_tiers_cache');
+    if (cachedTiers) {
+      try {
+        setTiers(JSON.parse(cachedTiers));
+        setLoading(false);
+      } catch (e) {
+        console.error('Error parsing cached tiers', e);
+      }
+    }
+    
     loadTiers();
   }, []);
 
@@ -41,7 +52,11 @@ export default function PricingTiers() {
         .order('amount', { ascending: true });
 
       if (error) throw error;
-      setTiers(data || []);
+      if (data) {
+        setTiers(data);
+        // Cache tiers
+        sessionStorage.setItem('pricing_tiers_cache', JSON.stringify(data));
+      }
     } catch (error) {
       console.error('Error loading pricing tiers:', error);
       toast({

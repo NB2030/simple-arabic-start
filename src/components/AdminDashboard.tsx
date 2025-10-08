@@ -23,19 +23,48 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     loadData();
+    
+    // Cache data to reduce database calls
+    const cacheKey = 'admin_dashboard_cache';
+    const cachedData = sessionStorage.getItem(cacheKey);
+    const cacheTime = sessionStorage.getItem(cacheKey + '_time');
+    
+    // Use cache if less than 5 minutes old
+    if (cachedData && cacheTime) {
+      const age = Date.now() - parseInt(cacheTime);
+      if (age < 5 * 60 * 1000) {
+        const { licenses: cachedLicenses, userLicenses: cachedUserLicenses } = JSON.parse(cachedData);
+        setLicenses(cachedLicenses);
+        setUserLicenses(cachedUserLicenses);
+        setLoading(false);
+        return;
+      }
+    }
+    
+    loadData();
   }, []);
 
   const loadData = async () => {
     try {
       const [licensesRes, userLicensesRes] = await Promise.all([
-        supabase.from('licenses').select('*').order('created_at', { ascending: false }),
+        supabase.from('licenses').select('*').order('created_at', { ascending: false }).limit(50),
         supabase
           .from('user_licenses')
           .select('*, profiles(*), licenses(*)')
-          .order('activated_at', { ascending: false }),
+          .order('activated_at', { ascending: false })
+          .limit(50),
       ]);
 
-      if (licensesRes.data) setLicenses(licensesRes.data);
+      if (licensesRes.data) {
+        setLicenses(licensesRes.data);
+        // Cache the data
+        const cacheData = { 
+          licenses: licensesRes.data, 
+          userLicenses: userLicensesRes.data 
+        };
+        sessionStorage.setItem('admin_dashboard_cache', JSON.stringify(cacheData));
+        sessionStorage.setItem('admin_dashboard_cache_time', Date.now().toString());
+      }
       if (userLicensesRes.data) setUserLicenses(userLicensesRes.data);
     } catch (error) {
       console.error('Error loading data:', error);

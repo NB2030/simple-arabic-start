@@ -32,6 +32,17 @@ export default function KofiOrders() {
   const { toast } = useToast();
 
   useEffect(() => {
+    // Load from cache first
+    const cachedOrders = sessionStorage.getItem('kofi_orders_cache');
+    if (cachedOrders) {
+      try {
+        setOrders(JSON.parse(cachedOrders));
+        setLoading(false);
+      } catch (e) {
+        console.error('Error parsing cached orders', e);
+      }
+    }
+    
     loadOrders();
   }, []);
 
@@ -41,10 +52,14 @@ export default function KofiOrders() {
         .from('kofi_orders')
         .select('*, licenses(license_key)')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(50);
 
       if (error) throw error;
-      setOrders(data || []);
+      if (data) {
+        setOrders(data);
+        // Cache orders for faster loading
+        sessionStorage.setItem('kofi_orders_cache', JSON.stringify(data));
+      }
     } catch (error) {
       console.error('Error loading Ko-fi orders:', error);
     } finally {
