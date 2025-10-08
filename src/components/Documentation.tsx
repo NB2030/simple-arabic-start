@@ -3,8 +3,9 @@ import { useState } from 'react';
 import ApiDocumentation from './docs/ApiDocumentation';
 import MigrationDocumentation from './docs/MigrationDocumentation';
 import KofiWebhookDocumentation from './docs/KofiWebhookDocumentation';
+import PasswordChangeDocumentation from './docs/PasswordChangeDocumentation';
 
-type TabType = 'api' | 'migration' | 'kofi';
+type TabType = 'api' | 'migration' | 'kofi' | 'password';
 
 export default function Documentation() {
   const [activeTab, setActiveTab] = useState<TabType>('api');
@@ -55,6 +56,16 @@ export default function Documentation() {
             >
               Ko-fi Webhook
             </button>
+            <button
+              onClick={() => setActiveTab('password')}
+              className={`flex-1 px-6 py-4 text-center font-semibold transition-colors ${
+                activeTab === 'password'
+                  ? 'border-b-2 border-blue-600 text-blue-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              تغيير كلمة المرور
+            </button>
           </div>
         </div>
 
@@ -62,6 +73,7 @@ export default function Documentation() {
         {activeTab === 'api' && <ApiDocumentation />}
         {activeTab === 'migration' && <MigrationDocumentation />}
         {activeTab === 'kofi' && <KofiWebhookDocumentation />}
+        {activeTab === 'password' && <PasswordChangeDocumentation />}
       </div>
     </div>
   );
