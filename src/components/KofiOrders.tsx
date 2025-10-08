@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../integrations/supabase/client';
-import { AlertCircle, CheckCircle, Package, Trash2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Package, Trash2, Filter, ShoppingBag, DollarSign } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 
 interface KofiOrder {
@@ -17,14 +17,18 @@ interface KofiOrder {
   user_id: string | null;
   license_id: string | null;
   created_at: string | null;
+  shop_items?: any;
   licenses?: {
     license_key: string;
   } | null;
 }
 
+type FilterType = 'all' | 'Shop Order' | 'Donation';
+
 export default function KofiOrders() {
   const [orders, setOrders] = useState<KofiOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterType, setFilterType] = useState<FilterType>('all');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -37,7 +41,7 @@ export default function KofiOrders() {
         .from('kofi_orders')
         .select('*, licenses(license_key)')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) throw error;
       setOrders(data || []);
@@ -72,6 +76,21 @@ export default function KofiOrders() {
     }
   };
 
+  const formatDate = (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString('ar-SA', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const filteredOrders = orders.filter(order => {
+    if (filterType === 'all') return true;
+    return order.type === filterType;
+  });
+
   if (loading) {
     return (
       <div className="flex justify-center items-center p-8">
@@ -82,87 +101,190 @@ export default function KofiOrders() {
 
   if (orders.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-sm p-8 text-center mx-8 mt-8">
-        <Package className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-        <p className="text-gray-500">لا توجد طلبات Ko-fi بعد</p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" dir="rtl">
+        <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+          <Package className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+          <p className="text-gray-500">لا توجد طلبات Ko-fi بعد</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" dir="rtl">
-      <h2 className="text-2xl font-bold mb-6 text-gray-900">طلبات Ko-fi</h2>
-      
-      <div className="grid gap-4">
-        {orders.map((order) => (
-          <div key={order.id} className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  {order.processed ? (
-                    <CheckCircle className="w-5 h-5 text-green-500" />
-                  ) : (
-                    <AlertCircle className="w-5 h-5 text-yellow-500" />
-                  )}
-                  <h3 className="font-semibold text-lg">{order.from_name || 'غير معروف'}</h3>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-500">البريد الإلكتروني:</span>
-                    <p className="font-medium">{order.email}</p>
-                  </div>
-                  
-                  <div>
-                    <span className="text-gray-500">المبلغ:</span>
-                    <p className="font-medium">{order.amount} {order.currency || 'USD'}</p>
-                  </div>
-                  
-                  <div>
-                    <span className="text-gray-500">النوع:</span>
-                    <p className="font-medium">{order.type}</p>
-                  </div>
-                  
-                  <div>
-                    <span className="text-gray-500">التاريخ:</span>
-                    <p className="font-medium">
-                      {new Date(order.timestamp).toLocaleDateString('ar-SA')}
-                    </p>
-                  </div>
-                  
-                  {order.licenses && (
-                    <div className="col-span-2">
-                      <span className="text-gray-500">مفتاح الترخيص:</span>
-                      <p className="font-mono text-sm bg-gray-100 p-2 rounded mt-1">
-                        {order.licenses.license_key}
-                      </p>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">طلبات Ko-fi</h2>
+        
+        {/* Filter Buttons */}
+        <div className="flex items-center gap-2 bg-white rounded-lg p-2 shadow-sm">
+          <Filter className="w-5 h-5 text-gray-500" />
+          <button
+            onClick={() => setFilterType('all')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+              filterType === 'all'
+                ? 'bg-blue-600 text-white'
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <Package className="w-4 h-4" />
+            الكل ({orders.length})
+          </button>
+          <button
+            onClick={() => setFilterType('Shop Order')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+              filterType === 'Shop Order'
+                ? 'bg-blue-600 text-white'
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <ShoppingBag className="w-4 h-4" />
+            طلبات المتجر ({orders.filter(o => o.type === 'Shop Order').length})
+          </button>
+          <button
+            onClick={() => setFilterType('Donation')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+              filterType === 'Donation'
+                ? 'bg-blue-600 text-white'
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <DollarSign className="w-4 h-4" />
+            التبرعات ({orders.filter(o => o.type === 'Donation').length})
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  النوع
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  الاسم
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  البريد الإلكتروني
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  المبلغ
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  المنتجات
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  مفتاح الترخيص
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  التاريخ
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  الحالة
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  إجراءات
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredOrders.map((order) => (
+                <tr key={order.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      {order.type === 'Shop Order' ? (
+                        <>
+                          <ShoppingBag className="w-5 h-5 text-blue-600" />
+                          <span className="text-sm font-medium text-blue-600">طلب متجر</span>
+                        </>
+                      ) : (
+                        <>
+                          <DollarSign className="w-5 h-5 text-green-600" />
+                          <span className="text-sm font-medium text-green-600">تبرع</span>
+                        </>
+                      )}
                     </div>
-                  )}
-                  
-                  <div className="col-span-2">
-                    <span className="text-gray-500">الحالة:</span>
-                    <p className={`font-medium ${order.processed ? 'text-green-600' : 'text-yellow-600'}`}>
-                      {order.processed ? 'تم التفعيل تلقائياً' : 'بانتظار حساب المستخدم'}
-                    </p>
-                    {!order.processed && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        سيتم تفعيل الترخيص تلقائياً عندما يقوم المستخدم بإنشاء حساب بنفس البريد الإلكتروني
-                      </p>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {order.from_name || 'غير معروف'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {order.email}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                    ${order.amount} {order.currency || 'USD'}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {order.shop_items && Array.isArray(order.shop_items) && order.shop_items.length > 0 ? (
+                      <div className="space-y-1">
+                        {order.shop_items.map((item: any, idx: number) => (
+                          <div key={idx} className="text-xs">
+                            <span className="font-medium">{item.variation_name || item.direct_link_code}</span>
+                            <span className="text-gray-500"> (x{item.quantity})</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">-</span>
                     )}
-                  </div>
-                </div>
-              </div>
-              
-              <button
-                onClick={() => deleteOrder(order.id)}
-                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
-                title="حذف الطلب"
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
-            </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {order.licenses ? (
+                      <code className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
+                        {order.licenses.license_key}
+                      </code>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {formatDate(order.timestamp)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {order.processed ? (
+                      <div className="flex items-center gap-1">
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                        <span className="text-sm text-green-600 font-medium">تم التفعيل</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <AlertCircle className="w-5 h-5 text-yellow-500" />
+                        <span className="text-sm text-yellow-600 font-medium">بانتظار الحساب</span>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <button
+                      onClick={() => deleteOrder(order.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="حذف الطلب"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {filteredOrders.length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            لا توجد طلبات من نوع "{filterType === 'Shop Order' ? 'طلبات المتجر' : filterType === 'Donation' ? 'التبرعات' : 'الكل'}"
           </div>
-        ))}
+        )}
+      </div>
+
+      {/* Info Box */}
+      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h3 className="font-semibold text-blue-900 mb-2">💡 كيفية ربط المنتجات بمدة الترخيص:</h3>
+        <ol className="text-sm text-blue-800 space-y-1 mr-4">
+          <li>1. انتقل إلى صفحة "فئات التسعير"</li>
+          <li>2. أضف فئة جديدة واستخدم اسم المنتج في Ko-fi ضمن اسم الفئة</li>
+          <li>3. مثال: إذا كان اسم المنتج "Premium License"، اجعل اسم الفئة "Premium License - سنة كاملة"</li>
+          <li>4. عندما يشتري أحد هذا المنتج، سيتم تطبيق المدة المحددة في الفئة تلقائياً</li>
+        </ol>
       </div>
     </div>
   );

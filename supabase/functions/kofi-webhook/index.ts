@@ -107,19 +107,59 @@ Deno.serve(async (req: Request) => {
 
     console.log('User found:', profile ? 'Yes' : 'No');
 
-    // Get pricing tier based on amount
-    const amount = parseFloat(data.amount);
-    
-    const { data: pricingTiers } = await supabase
-      .from('pricing_tiers')
-      .select('*')
-      .lte('amount', amount)
-      .eq('is_active', true)
-      .order('amount', { ascending: false })
-      .limit(1);
+    // Determine duration based on shop items or amount
+    let durationDays = 30; // default
+    let tierUsed = 'افتراضي';
 
-    const tier = pricingTiers?.[0];
-    const durationDays = tier?.duration_days || 30;
+    if (data.shop_items && data.shop_items.length > 0) {
+      // Try to match by variation_name or direct_link_code
+      const firstItem = data.shop_items[0];
+      console.log('Shop item:', firstItem);
+
+      // Check if variation_name or direct_link_code matches a pricing tier
+      const { data: tierByName } = await supabase
+        .from('pricing_tiers')
+        .select('*')
+        .ilike('name', `%${firstItem.variation_name || firstItem.direct_link_code}%`)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (tierByName) {
+        durationDays = tierByName.duration_days;
+        tierUsed = tierByName.name;
+        console.log('Matched tier by name:', tierUsed);
+      } else {
+        // Fallback to amount-based pricing
+        const amount = parseFloat(data.amount);
+        const { data: pricingTiers } = await supabase
+          .from('pricing_tiers')
+          .select('*')
+          .lte('amount', amount)
+          .eq('is_active', true)
+          .order('amount', { ascending: false })
+          .limit(1);
+
+        const tier = pricingTiers?.[0];
+        durationDays = tier?.duration_days || 30;
+        tierUsed = tier?.name || 'افتراضي';
+      }
+    } else {
+      // Regular donation - use amount-based pricing
+      const amount = parseFloat(data.amount);
+      const { data: pricingTiers } = await supabase
+        .from('pricing_tiers')
+        .select('*')
+        .lte('amount', amount)
+        .eq('is_active', true)
+        .order('amount', { ascending: false })
+        .limit(1);
+
+      const tier = pricingTiers?.[0];
+      durationDays = tier?.duration_days || 30;
+      tierUsed = tier?.name || 'افتراضي';
+    }
+
+    console.log('Duration days:', durationDays, 'Tier:', tierUsed);
 
     // Create license for the purchase
     const licenseKey = `KOFI-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
@@ -132,7 +172,7 @@ Deno.serve(async (req: Request) => {
         max_activations: 1,
         current_activations: 0,
         is_active: true,
-        notes: `Ko-fi purchase - ${data.from_name} - ${data.amount} ${data.currency}`,
+        notes: `Ko-fi ${data.type} - ${data.from_name} - ${data.amount} ${data.currency} - ${tierUsed}`,
       })
       .select()
       .single();
