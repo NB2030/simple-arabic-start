@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../integrations/supabase/client';
-import { AlertCircle, CheckCircle, Package, Trash2, Filter, ShoppingBag, DollarSign, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle, Package, Trash2, Filter, ShoppingBag, DollarSign } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 
 interface KofiOrder {
@@ -29,7 +29,6 @@ export default function KofiOrders() {
   const [orders, setOrders] = useState<KofiOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<FilterType>('all');
-  const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -65,56 +64,6 @@ export default function KofiOrders() {
       console.error('Error loading Ko-fi orders:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const refreshOrders = async () => {
-    setRefreshing(true);
-    try {
-      // Get the most recent order timestamp
-      const lastCreatedAt = orders.length > 0 ? orders[0].created_at : null;
-      
-      let query = supabase
-        .from('kofi_orders')
-        .select('*, licenses(license_key)')
-        .order('created_at', { ascending: false });
-      
-      // Only fetch new orders if we have existing data
-      if (lastCreatedAt) {
-        query = query.gt('created_at', lastCreatedAt);
-      }
-      
-      const { data, error } = await query.limit(50);
-      
-      if (error) throw error;
-      
-      if (data && data.length > 0) {
-        // Merge new orders with existing ones
-        const updatedOrders = [...data, ...orders].slice(0, 50);
-        setOrders(updatedOrders);
-        
-        // Update cache
-        sessionStorage.setItem('kofi_orders_cache', JSON.stringify(updatedOrders));
-        
-        toast({
-          title: "تم التحديث",
-          description: `تم إضافة ${data.length} طلب جديد`
-        });
-      } else {
-        toast({
-          title: "لا يوجد جديد",
-          description: "لا توجد طلبات جديدة"
-        });
-      }
-    } catch (error) {
-      console.error('Error refreshing orders:', error);
-      toast({
-        variant: "destructive",
-        title: "خطأ",
-        description: "فشل تحديث الطلبات"
-      });
-    } finally {
-      setRefreshing(false);
     }
   };
 
@@ -179,18 +128,7 @@ export default function KofiOrders() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" dir="rtl">
       <div className="mb-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-gray-900">طلبات Ko-fi</h2>
-          <button
-            onClick={refreshOrders}
-            disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-            title="تحديث القائمة"
-          >
-            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-            تحديث
-          </button>
-        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">طلبات Ko-fi</h2>
         
         {/* Filter Buttons */}
         <div className="flex items-center gap-2 bg-white rounded-lg p-2 shadow-sm">
