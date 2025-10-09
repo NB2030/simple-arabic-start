@@ -21,11 +21,7 @@ function App() {
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event: string, session: any) => {
       if (_event === 'SIGNED_IN' && session) {
-        // Only check admin status if not already authenticated
-        // This prevents unnecessary calls on every auth state change
-        if (!isAuthenticated) {
-          checkAdminStatus();
-        }
+        checkAdminStatus();
       } else if (_event === 'SIGNED_OUT') {
         setIsAuthenticated(false);
       }
@@ -34,7 +30,7 @@ function App() {
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, [isAuthenticated]);
+  }, []);
 
   const checkAuth = async () => {
     try {
